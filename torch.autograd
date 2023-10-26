@@ -1,1 +1,61 @@
+########################################################################
+Autograd Profiler
+device = torch.device('cpu')
+run_on_gpu = False
+if torch.cuda.is_available():
+    device = torch.device('cuda')
+    run_on_gpu = True
 
+x = torch.randn(2, 3, requires_grad=True)
+y = torch.rand(2, 3, requires_grad=True)
+z = torch.ones(2, 3, requires_grad=True)
+
+with torch.autograd.profiler.profile(use_cuda=run_on_gpu) as prf:
+    for _ in range(1000):
+        z = (z / x) * y
+
+print(prf.key_averages().table(sort_by='self_cpu_time_total'))
+##########################################################################
+https://pytorch.org/tutorials/beginner/introyt/autogradyt_tutorial.html in Advanced Topic
+
+If you have a function with an n-dimensional input and m-dimensional output y^ = f(x^), 
+the complete gradient is a matrix of the derivative of every output with respect to every input, called the Jacobian
+
+J = |∂y_1/∂x_1 ... ∂y_1/∂x_n|
+    |          ...          |
+    |∂y_m/∂x_1 ... ∂y_m/∂x_n|
+
+If you have a second function, l=g(y^) that  takes m-dimensional input (
+that is, the same dimensionality as the output above), and returns a scalar output, you can express its gradients with respect to 
+y^ as a column vector, v = (∂l/∂y_1 ... ∂l/y_m)
+
+Suppose that the first function(J) as your PyTorch model (with potentially many inputs and many outputs) 
+and the second function(v) as a loss function (with the model’s output as input, and the loss value as the scalar output)
+
+If we multiply the first function’s Jacobian by the gradient of the second function, and apply the chain rule, we get
+
+J^T · v = |∂y_1/∂x_1 ... ∂y_m/∂x_1| |∂l/∂y_1|   |∂l/∂x_1|
+          |          ...          | |  ...  | = |  ...  |   
+          |∂y_1/∂x_n ... ∂y_m/∂x_n| |∂l/∂y_m|   |∂l/∂x_n|
+
+The resulting column vector is the gradient of the second function with respect to the inputs of the first 
+ or in the case of our model and loss function, the gradient of the loss with respect to the model inputs.
+
+``torch.autograd`` is an engine for computing these products.
+This is how we accumulate the gradients over the learning weights during the backward pass
+
+For this reason, the backward() call can also take an optional vector input. This vector represents a set of gradients over the tensor, 
+which are multiplied by the Jacobian of the autograd-traced tensor that precedes
+
+## The High-Level API
+There is an API on autograd that gives you direct access to important differential matrix and vector operations. 
+In particular, it allows you to calculate the Jacobian and the Hessian matrices of a particular function for particular inputs. 
+(The Hessian is like the Jacobian, but expresses all partial second derivatives.) 
+
+Ex)
+def exp_adder(x, y):
+    return 2 * x.exp() + 3 * y
+
+inputs = (torch.rand(1), torch.rand(1)) # arguments for the function
+print(inputs)
+torch.autograd.functional.jacobian(exp_adder, inputs)
